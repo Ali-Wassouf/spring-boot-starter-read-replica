@@ -20,7 +20,10 @@ jobs:
           cache: 'maven'
 
       - name: Import GPG key
-        run: echo "${{ secrets.GPG_PRIVATE_KEY }}" | base64 --decode | gpg --import
+        uses: crazy-max/ghaction-import-gpg@v6
+        with:
+          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
+          passphrase: ${{ secrets.GPG_PASSPHRASE }}
 
       - name: Configure Maven settings
         run: |
@@ -45,5 +48,3 @@ jobs:
 
       - name: Deploy to Maven Central
         run: mvn --no-transfer-progress deploy -Prelease -DskipTests
-        env:
-          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
