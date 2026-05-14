@@ -5,8 +5,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.jdbc.datasource.LazyConnectionDataSourceProxy;
-import org.springframework.jdbc.datasource.lookup.AbstractRoutingDataSource;
+import space.aliwasouf.readreplica.DataSourceHealthMonitor;
 import space.aliwasouf.readreplica.RoutingDataSource;
+import space.aliwasouf.readreplica.RoutingTarget;
 
 import javax.sql.DataSource;
 
@@ -16,8 +17,7 @@ class ReadReplicaAutoConfigurationTest {
 
     /**
      * Pool init is skipped (initialization-fail-timeout=-1) so the slice
-     * test runs without Docker or H2 — we only verify wiring, not real
-     * connectivity. Integration tests cover real connectivity.
+     * test runs without Docker or H2. We verify wiring only.
      */
     private final ApplicationContextRunner runner = new ApplicationContextRunner()
             .withConfiguration(AutoConfigurations.of(ReadReplicaAutoConfiguration.class))
@@ -26,10 +26,12 @@ class ReadReplicaAutoConfigurationTest {
                     "spring.datasource.routing.master.username=u",
                     "spring.datasource.routing.master.password=p",
                     "spring.datasource.routing.master.pool.initialization-fail-timeout=-1",
+                    "spring.datasource.routing.master.probe-interval-seconds=0",
                     "spring.datasource.routing.replica.url=jdbc:postgresql://localhost:5433/replica",
                     "spring.datasource.routing.replica.username=u",
                     "spring.datasource.routing.replica.password=p",
-                    "spring.datasource.routing.replica.pool.initialization-fail-timeout=-1"
+                    "spring.datasource.routing.replica.pool.initialization-fail-timeout=-1",
+                    "spring.datasource.routing.replica.retry-interval-seconds=0"
             );
 
     @Test
@@ -55,11 +57,15 @@ class ReadReplicaAutoConfigurationTest {
             LazyConnectionDataSourceProxy lazy =
                     (LazyConnectionDataSourceProxy) ctx.getBean(DataSource.class);
             assertThat(lazy.getTargetDataSource()).isInstanceOf(RoutingDataSource.class);
-            AbstractRoutingDataSource routing = (AbstractRoutingDataSource) lazy.getTargetDataSource();
+            RoutingDataSource routing = (RoutingDataSource) lazy.getTargetDataSource();
             assertThat(routing.getResolvedDataSources())
-                    .containsKeys(space.aliwasouf.readreplica.RoutingTarget.MASTER,
-                                  space.aliwasouf.readreplica.RoutingTarget.REPLICA);
+                    .containsKeys(RoutingTarget.MASTER, RoutingTarget.REPLICA);
         });
+    }
+
+    @Test
+    void registersHealthMonitor() {
+        runner.run(ctx -> assertThat(ctx).hasSingleBean(DataSourceHealthMonitor.class));
     }
 
     @Test

@@ -50,6 +50,13 @@ public abstract class AbstractReplicationIT {
                 () -> "jdbc:postgresql://" + replicaHost + ":" + replicaPort + "/appdb");
         r.add("spring.datasource.routing.replica.username", () -> "app");
         r.add("spring.datasource.routing.replica.password", () -> "app_pw");
+        // Short probe intervals + connection timeout so fallback/recovery ITs
+        // detect state changes quickly. Hikari's default connectionTimeout is
+        // 30 s — too slow for health probes; 3 s is still generous for local Docker.
+        r.add("spring.datasource.routing.replica.retry-interval-seconds", () -> "2");
+        r.add("spring.datasource.routing.master.probe-interval-seconds", () -> "2");
+        r.add("spring.datasource.routing.master.pool.connection-timeout", () -> "3000");
+        r.add("spring.datasource.routing.replica.pool.connection-timeout", () -> "3000");
 
         // No JPA entities in the test app — keep Hibernate quiet.
         r.add("spring.jpa.hibernate.ddl-auto", () -> "none");

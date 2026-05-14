@@ -4,6 +4,7 @@ import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import jakarta.persistence.EntityManagerFactory;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration;
@@ -14,6 +15,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 import org.springframework.core.env.Environment;
 import org.springframework.jdbc.datasource.LazyConnectionDataSourceProxy;
+import space.aliwasouf.readreplica.DataSourceHealthMonitor;
 import space.aliwasouf.readreplica.ReadOnlyAspect;
 import space.aliwasouf.readreplica.RoutingDataSource;
 import space.aliwasouf.readreplica.RoutingTarget;
@@ -32,13 +34,21 @@ public class ReadReplicaAutoConfiguration {
     @Bean(name = "masterDataSource")
     @ConditionalOnMissingBean(name = "masterDataSource")
     public DataSource masterDataSource(RoutingProperties properties, Environment environment) {
-        return buildHikari(properties.master(), MASTER_POOL_PREFIX, environment);
+        RoutingProperties.MasterEndpoint m = properties.master();
+        return buildHikari(m.url(), m.username(), m.password(), MASTER_POOL_PREFIX, environment);
     }
 
     @Bean(name = "replicaDataSource")
     @ConditionalOnMissingBean(name = "replicaDataSource")
     public DataSource replicaDataSource(RoutingProperties properties, Environment environment) {
-        return buildHikari(properties.replica(), REPLICA_POOL_PREFIX, environment);
+        RoutingProperties.ReplicaEndpoint r = properties.replica();
+        return buildHikari(r.url(), r.username(), r.password(), REPLICA_POOL_PREFIX, environment);
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    public DataSourceHealthMonitor dataSourceHealthMonitor(RoutingProperties properties) {
+        return new DataSourceHealthMonitor(properties);
     }
 
     @Bean
@@ -50,8 +60,12 @@ public class ReadReplicaAutoConfiguration {
     @Bean
     @Primary
     @ConditionalOnMissingBean(name = "dataSource")
-    public DataSource dataSource(DataSource masterDataSource, DataSource replicaDataSource) {
-        RoutingDataSource routing = new RoutingDataSource();
+    public DataSource dataSource(
+            @Qualifier("masterDataSource") DataSource masterDataSource,
+            @Qualifier("replicaDataSource") DataSource replicaDataSource,
+            DataSourceHealthMonitor healthMonitor) {
+
+        RoutingDataSource routing = new RoutingDataSource(healthMonitor);
         Map<Object, Object> targets = new HashMap<>();
         targets.put(RoutingTarget.MASTER, masterDataSource);
         targets.put(RoutingTarget.REPLICA, replicaDataSource);
@@ -62,16 +76,15 @@ public class ReadReplicaAutoConfiguration {
     }
 
     private static HikariDataSource buildHikari(
-            RoutingProperties.Endpoint endpoint,
-            String poolPrefix,
-            Environment environment) {
+            String url, String username, String password,
+            String poolPrefix, Environment environment) {
 
         HikariConfig config = Binder.get(environment)
                 .bind(poolPrefix, Bindable.of(HikariConfig.class))
                 .orElseGet(HikariConfig::new);
-        config.setJdbcUrl(endpoint.url());
-        config.setUsername(endpoint.username());
-        config.setPassword(endpoint.password());
+        config.setJdbcUrl(url);
+        config.setUsername(username);
+        config.setPassword(password);
         return new HikariDataSource(config);
     }
 }
