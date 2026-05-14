@@ -10,7 +10,31 @@
     <packaging>jar</packaging>
 
     <name>Spring Boot Starter: Read Replica Routing</name>
-    <description>Transparent read/write datasource routing between a write master and a read replica.</description>
+    <description>Transparent read/write datasource routing between a write master and a read replica for Spring Boot 3.x.</description>
+    <url>https://github.com/ali-wassouf/spring-boot-starter-read-replica</url>
+
+    <licenses>
+        <license>
+            <name>Apache License, Version 2.0</name>
+            <url>https://www.apache.org/licenses/LICENSE-2.0</url>
+            <distribution>repo</distribution>
+        </license>
+    </licenses>
+
+    <developers>
+        <developer>
+            <id>ali-wassouf</id>
+            <name>Ali Wassouf</name>
+            <email>ali.wassouf93@gmail.com</email>
+        </developer>
+    </developers>
+
+    <scm>
+        <connection>scm:git:git://github.com/ali-wassouf/spring-boot-starter-read-replica.git</connection>
+        <developerConnection>scm:git:ssh://github.com/ali-wassouf/spring-boot-starter-read-replica.git</developerConnection>
+        <url>https://github.com/ali-wassouf/spring-boot-starter-read-replica</url>
+        <tag>HEAD</tag>
+    </scm>
 
     <properties>
         <maven.compiler.source>17</maven.compiler.source>
@@ -56,13 +80,11 @@
         </dependency>
 
         <!-- ============= Optional integrations ============= -->
-        <!-- Health indicators activate when Actuator is on the consumer classpath -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
             <optional>true</optional>
         </dependency>
-        <!-- Metrics activate when Micrometer is on the consumer classpath -->
         <dependency>
             <groupId>io.micrometer</groupId>
             <artifactId>micrometer-core</artifactId>
@@ -139,4 +161,87 @@
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <!-- Activated by the release CI workflow via -Prelease -->
+        <profile>
+            <id>release</id>
+            <build>
+                <plugins>
+                    <!-- Sources jar (required by Maven Central) -->
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-source-plugin</artifactId>
+                        <version>3.3.1</version>
+                        <executions>
+                            <execution>
+                                <id>attach-sources</id>
+                                <goals>
+                                    <goal>jar-no-fork</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+
+                    <!-- Javadoc jar (required by Maven Central) -->
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-javadoc-plugin</artifactId>
+                        <version>3.11.1</version>
+                        <executions>
+                            <execution>
+                                <id>attach-javadocs</id>
+                                <goals>
+                                    <goal>jar</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                        <configuration>
+                            <!-- Don't fail the build on missing Javadoc tags -->
+                            <doclint>none</doclint>
+                        </configuration>
+                    </plugin>
+
+                    <!-- GPG signing (required by Maven Central) -->
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-gpg-plugin</artifactId>
+                        <version>3.2.7</version>
+                        <executions>
+                            <execution>
+                                <id>sign-artifacts</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>sign</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                        <configuration>
+                            <!-- Read passphrase from env var set by CI -->
+                            <passphraseEnvName>GPG_PASSPHRASE</passphraseEnvName>
+                            <gpgArguments>
+                                <!-- Required for non-interactive signing in CI -->
+                                <arg>--pinentry-mode</arg>
+                                <arg>loopback</arg>
+                            </gpgArguments>
+                        </configuration>
+                    </plugin>
+
+                    <!-- Sonatype Central Portal publisher -->
+                    <plugin>
+                        <groupId>org.sonatype.central</groupId>
+                        <artifactId>central-publishing-maven-plugin</artifactId>
+                        <version>0.6.0</version>
+                        <extensions>true</extensions>
+                        <configuration>
+                            <publishingServerId>central</publishingServerId>
+                            <!-- Auto-release without manual promotion on the portal -->
+                            <autoPublish>true</autoPublish>
+                            <waitUntil>published</waitUntil>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>
