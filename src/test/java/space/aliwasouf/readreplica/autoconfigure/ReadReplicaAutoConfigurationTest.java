@@ -4,6 +4,7 @@ import com.zaxxer.hikari.HikariDataSource;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
+import space.aliwasouf.readreplica.autoconfigure.ReadReplicaMetricsAutoConfiguration;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.jdbc.datasource.LazyConnectionDataSourceProxy;
 import space.aliwasouf.readreplica.DataSourceHealthMonitor;
@@ -21,7 +22,9 @@ class ReadReplicaAutoConfigurationTest {
      * test runs without Docker or H2. We verify wiring only.
      */
     private final ApplicationContextRunner runner = new ApplicationContextRunner()
-            .withConfiguration(AutoConfigurations.of(ReadReplicaAutoConfiguration.class))
+            .withConfiguration(AutoConfigurations.of(
+                    ReadReplicaAutoConfiguration.class,
+                    ReadReplicaMetricsAutoConfiguration.class))
             .withPropertyValues(
                     "spring.datasource.routing.master.url=jdbc:postgresql://localhost:5432/master",
                     "spring.datasource.routing.master.username=u",

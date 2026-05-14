@@ -2,7 +2,6 @@ package space.aliwasouf.readreplica.autoconfigure;
 
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
-import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.persistence.EntityManagerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -24,7 +23,6 @@ import org.springframework.jdbc.datasource.LazyConnectionDataSourceProxy;
 import space.aliwasouf.readreplica.DataSourceHealthMonitor;
 import space.aliwasouf.readreplica.ReadOnlyAspect;
 import space.aliwasouf.readreplica.RoutingDataSource;
-import space.aliwasouf.readreplica.RoutingMetrics;
 import space.aliwasouf.readreplica.RoutingTarget;
 
 import javax.sql.DataSource;
@@ -106,26 +104,6 @@ public class ReadReplicaAutoConfiguration {
             return () -> monitor.isReplicaHealthy()
                     ? Health.up().build()
                     : Health.down().build();
-        }
-    }
-
-    // ── Micrometer metrics ────────────────────────────────────────────────────
-    // Nested static class so MeterRegistry references are never loaded when
-    // Micrometer is absent from the consumer's classpath.
-
-    @Configuration(proxyBeanMethods = false)
-    @ConditionalOnClass(name = "io.micrometer.core.instrument.MeterRegistry")
-    static class MicrometerConfiguration {
-
-        @Bean
-        @ConditionalOnMissingBean
-        @ConditionalOnBean(MeterRegistry.class)
-        public RoutingMetrics routingMetrics(
-                MeterRegistry meterRegistry,
-                DataSourceHealthMonitor monitor) {
-            RoutingMetrics metrics = new RoutingMetrics(meterRegistry);
-            monitor.addTransitionListener(metrics);
-            return metrics;
         }
     }
 
