@@ -1,6 +1,7 @@
 package space.aliwasouf.readreplica.autoconfigure;
 
 import com.zaxxer.hikari.HikariDataSource;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
@@ -66,6 +67,21 @@ class ReadReplicaAutoConfigurationTest {
     @Test
     void registersHealthMonitor() {
         runner.run(ctx -> assertThat(ctx).hasSingleBean(DataSourceHealthMonitor.class));
+    }
+
+    @Test
+    void registersHealthIndicatorsWhenActuatorPresent() {
+        runner.run(ctx -> {
+            assertThat(ctx).hasBean("masterDb");
+            assertThat(ctx).hasBean("replicaDb");
+        });
+    }
+
+    @Test
+    void registersRoutingMetricsWhenMicrometerPresent() {
+        runner.withBean(SimpleMeterRegistry.class)
+              .run(ctx -> assertThat(ctx).hasSingleBean(
+                      space.aliwasouf.readreplica.RoutingMetrics.class));
     }
 
     @Test

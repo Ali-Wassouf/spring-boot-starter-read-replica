@@ -10,6 +10,8 @@ import space.aliwasouf.readreplica.autoconfigure.RoutingProperties;
 import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -17,12 +19,18 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 public class DataSourceHealthMonitor implements DisposableBean {
 
-    private static final Logger log = LoggerFactory.getLogger(DataSourceHealthMonitor.class);
+    /** Notified on every {@code HEALTHY → UNHEALTHY} or {@code UNHEALTHY → HEALTHY} transition. */
+    @FunctionalInterface
+    public interface Listener {
+        void onTransition(RoutingTarget target, boolean nowHealthy);
+    }
 
+    private static final Logger log = LoggerFactory.getLogger(DataSourceHealthMonitor.class);
     private static final int PROBE_CONNECTION_TIMEOUT_MS = 3_000;
 
     private final AtomicBoolean masterHealthy = new AtomicBoolean(true);
     private final AtomicBoolean replicaHealthy = new AtomicBoolean(true);
+    private final List<Listener> listeners = new CopyOnWriteArrayList<>();
 
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
         Thread t = new Thread(r, "datasource-health-monitor");
@@ -30,11 +38,6 @@ public class DataSourceHealthMonitor implements DisposableBean {
         return t;
     });
 
-    /**
-     * Production constructor. Creates dedicated single-connection probe DataSources
-     * with a short {@code connectionTimeout} so probes fail fast regardless of the
-     * application pool's settings.
-     */
     public DataSourceHealthMonitor(RoutingProperties properties) {
         this(
                 buildProbeDataSource(
@@ -70,6 +73,10 @@ public class DataSourceHealthMonitor implements DisposableBean {
         }
     }
 
+    public void addTransitionListener(Listener listener) {
+        listeners.add(listener);
+    }
+
     private void probe(DataSource probeDataSource, RoutingTarget target, AtomicBoolean healthFlag) {
         boolean nowHealthy;
         try (Connection connection = probeDataSource.getConnection()) {
@@ -82,8 +89,10 @@ public class DataSourceHealthMonitor implements DisposableBean {
 
         if (wasHealthy && !nowHealthy) {
             log.warn("Datasource [{}] is UNHEALTHY", target);
+            listeners.forEach(l -> l.onTransition(target, false));
         } else if (!wasHealthy && nowHealthy) {
             log.info("Datasource [{}] has RECOVERED", target);
+            listeners.forEach(l -> l.onTransition(target, true));
         }
     }
 

@@ -2,22 +2,29 @@ package space.aliwasouf.readreplica.autoconfigure;
 
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
+import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.persistence.EntityManagerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.actuate.health.Health;
+import org.springframework.boot.actuate.health.HealthIndicator;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.context.properties.bind.Bindable;
 import org.springframework.boot.context.properties.bind.Binder;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
 import org.springframework.core.env.Environment;
 import org.springframework.jdbc.datasource.LazyConnectionDataSourceProxy;
 import space.aliwasouf.readreplica.DataSourceHealthMonitor;
 import space.aliwasouf.readreplica.ReadOnlyAspect;
 import space.aliwasouf.readreplica.RoutingDataSource;
+import space.aliwasouf.readreplica.RoutingMetrics;
 import space.aliwasouf.readreplica.RoutingTarget;
 
 import javax.sql.DataSource;
@@ -74,6 +81,55 @@ public class ReadReplicaAutoConfiguration {
         routing.afterPropertiesSet();
         return new LazyConnectionDataSourceProxy(routing);
     }
+
+    // ── Actuator health indicators ────────────────────────────────────────────
+    // Nested static class so HealthIndicator references are never loaded when
+    // spring-boot-starter-actuator is absent from the consumer's classpath.
+
+    @Configuration(proxyBeanMethods = false)
+    @ConditionalOnClass(name = "org.springframework.boot.actuate.health.HealthIndicator")
+    static class ActuatorConfiguration {
+
+        @Bean(name = "masterDb")
+        @ConditionalOnMissingBean(name = "masterDb")
+        public HealthIndicator masterDbHealthIndicator(
+                DataSourceHealthMonitor monitor) {
+            return () -> monitor.isMasterHealthy()
+                    ? Health.up().build()
+                    : Health.down().build();
+        }
+
+        @Bean(name = "replicaDb")
+        @ConditionalOnMissingBean(name = "replicaDb")
+        public HealthIndicator replicaDbHealthIndicator(
+                DataSourceHealthMonitor monitor) {
+            return () -> monitor.isReplicaHealthy()
+                    ? Health.up().build()
+                    : Health.down().build();
+        }
+    }
+
+    // ── Micrometer metrics ────────────────────────────────────────────────────
+    // Nested static class so MeterRegistry references are never loaded when
+    // Micrometer is absent from the consumer's classpath.
+
+    @Configuration(proxyBeanMethods = false)
+    @ConditionalOnClass(name = "io.micrometer.core.instrument.MeterRegistry")
+    static class MicrometerConfiguration {
+
+        @Bean
+        @ConditionalOnMissingBean
+        @ConditionalOnBean(MeterRegistry.class)
+        public RoutingMetrics routingMetrics(
+                MeterRegistry meterRegistry,
+                DataSourceHealthMonitor monitor) {
+            RoutingMetrics metrics = new RoutingMetrics(meterRegistry);
+            monitor.addTransitionListener(metrics);
+            return metrics;
+        }
+    }
+
+    // ── shared helper ─────────────────────────────────────────────────────────
 
     private static HikariDataSource buildHikari(
             String url, String username, String password,
