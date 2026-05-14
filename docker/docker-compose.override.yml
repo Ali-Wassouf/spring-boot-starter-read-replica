@@ -1,0 +1,18 @@
+# Local-dev convenience overrides. Auto-loaded by `docker compose up`
+# when run from this directory. Not used by Testcontainers (it loads
+# only the base docker-compose.yml).
+#
+# Adds:
+#   - friendly container names
+#   - fixed host port bindings (5432 = master, 5433 = replica)
+
+services:
+  postgres-master:
+    container_name: rr-postgres-master
+    ports:
+      - "5432:5432"
+
+  postgres-replica:
+    container_name: rr-postgres-replica
+    ports:
+      - "5433:5432"

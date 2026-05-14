@@ -1,0 +1,50 @@
+# Postgres master + streaming replica.
+#
+# This base file deliberately omits host-port bindings and container
+# names so it can be reused by Testcontainers' ComposeContainer for
+# parallel test runs (Testcontainers assigns random host ports and
+# unique container names).
+#
+# For local development:
+#   cd docker && docker compose up
+# That auto-loads docker-compose.override.yml, which adds fixed host
+# port mappings (5432, 5433) and friendly container names.
+
+services:
+  postgres-master:
+    image: bitnamilegacy/postgresql:16
+    environment:
+      POSTGRESQL_REPLICATION_MODE: master
+      POSTGRESQL_REPLICATION_USER: replicator
+      POSTGRESQL_REPLICATION_PASSWORD: replicator_pw
+      POSTGRESQL_USERNAME: app
+      POSTGRESQL_PASSWORD: app_pw
+      POSTGRESQL_DATABASE: appdb
+    expose:
+      - "5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d appdb"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  postgres-replica:
+    image: bitnamilegacy/postgresql:16
+    environment:
+      POSTGRESQL_REPLICATION_MODE: slave
+      POSTGRESQL_REPLICATION_USER: replicator
+      POSTGRESQL_REPLICATION_PASSWORD: replicator_pw
+      POSTGRESQL_MASTER_HOST: postgres-master
+      POSTGRESQL_MASTER_PORT_NUMBER: 5432
+      POSTGRESQL_USERNAME: app
+      POSTGRESQL_PASSWORD: app_pw
+    expose:
+      - "5432"
+    depends_on:
+      postgres-master:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d appdb"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
