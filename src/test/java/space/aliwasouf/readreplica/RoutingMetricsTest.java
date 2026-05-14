@@ -1,6 +1,7 @@
 package space.aliwasouf.readreplica;
 
 import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -18,12 +19,46 @@ class RoutingMetricsTest {
         metrics = new RoutingMetrics(registry);
     }
 
+    // ── Gauges ───────────────────────────────────────────────────────────────
+
     @Test
-    void allCountersPreRegisteredAtZero() {
+    void gaugesStartAtOne() {
+        assertThat(gauge("master").value()).isEqualTo(1.0);
+        assertThat(gauge("replica").value()).isEqualTo(1.0);
+    }
+
+    @Test
+    void gaugeDropsToZeroOnUnhealthyTransition() {
+        metrics.onTransition(RoutingTarget.REPLICA, false);
+
+        assertThat(gauge("replica").value()).isZero();
+        assertThat(gauge("master").value()).isEqualTo(1.0);
+    }
+
+    @Test
+    void gaugeReturnsToOneOnRecovery() {
+        metrics.onTransition(RoutingTarget.REPLICA, false);
+        metrics.onTransition(RoutingTarget.REPLICA, true);
+
+        assertThat(gauge("replica").value()).isEqualTo(1.0);
+    }
+
+    @Test
+    void masterAndReplicaGaugesAreIndependent() {
+        metrics.onTransition(RoutingTarget.MASTER, false);
+
+        assertThat(gauge("master").value()).isZero();
+        assertThat(gauge("replica").value()).isEqualTo(1.0);
+    }
+
+    // ── Counters ─────────────────────────────────────────────────────────────
+
+    @Test
+    void countersStartAtZero() {
         for (RoutingTarget target : RoutingTarget.values()) {
             String tag = target.name().toLowerCase();
             assertThat(counter("datasource.routing.unhealthy", tag).count()).isZero();
-            assertThat(counter("datasource.routing.recovered", tag).count()).isZero();
+            assertThat(counter("datasource.routing.recovered",  tag).count()).isZero();
         }
     }
 
@@ -42,7 +77,6 @@ class RoutingMetricsTest {
 
         assertThat(counter("datasource.routing.recovered", "master").count()).isEqualTo(1.0);
         assertThat(counter("datasource.routing.unhealthy", "master").count()).isZero();
-        assertThat(counter("datasource.routing.recovered", "replica").count()).isZero();
     }
 
     @Test
@@ -53,6 +87,13 @@ class RoutingMetricsTest {
 
         assertThat(counter("datasource.routing.unhealthy", "replica").count()).isEqualTo(2.0);
         assertThat(counter("datasource.routing.recovered",  "replica").count()).isEqualTo(1.0);
+        assertThat(gauge("replica").value()).isZero();
+    }
+
+    // ── helpers ───────────────────────────────────────────────────────────────
+
+    private Gauge gauge(String targetTag) {
+        return registry.get("datasource.routing.healthy").tag("target", targetTag).gauge();
     }
 
     private Counter counter(String name, String targetTag) {
