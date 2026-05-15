@@ -2,7 +2,7 @@
 
 A Spring Boot 3.x starter that provides **transparent read/write datasource routing** between a write master and a read replica. Add the dependency, configure two datasources, and annotate your service methods with `@ReadOnly` — no boilerplate required.
 
-[![Maven Central](https://img.shields.io/maven-central/v/space.aliwasouf/spring-boot-starter-read-replica)](https://central.sonatype.com/artifact/space.aliwasouf/spring-boot-starter-read-replica)
+[![Maven Central](https://img.shields.io/maven-central/v/space.aliwassouf/spring-boot-starter-read-replica)](https://central.sonatype.com/artifact/space.aliwassouf/spring-boot-starter-read-replica)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
 [![Java](https://img.shields.io/badge/Java-17%2B-orange)](https://openjdk.org/)
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.x-green)](https://spring.io/projects/spring-boot)
@@ -23,7 +23,7 @@ A Spring Boot 3.x starter that provides **transparent read/write datasource rout
 
 ```xml
 <dependency>
-    <groupId>space.aliwasouf</groupId>
+    <groupId>space.aliwassouf</groupId>
     <artifactId>spring-boot-starter-read-replica</artifactId>
     <version>0.1.0</version>
 </dependency>
