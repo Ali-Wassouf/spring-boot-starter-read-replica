@@ -12,7 +12,7 @@
 
 services:
   postgres-master:
-    image: bitnamilegacy/postgresql:16
+    image: soldevelo/postgresql:16
     environment:
       POSTGRESQL_REPLICATION_MODE: master
       POSTGRESQL_REPLICATION_USER: replicator
@@ -29,7 +29,7 @@ services:
       retries: 20
 
   postgres-replica:
-    image: bitnamilegacy/postgresql:16
+    image: soldevelo/postgresql:16
     environment:
       POSTGRESQL_REPLICATION_MODE: slave
       POSTGRESQL_REPLICATION_USER: replicator
